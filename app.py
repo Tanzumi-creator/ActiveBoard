@@ -14,7 +14,7 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 st.markdown("<h2 class='header-text'>สำนักงานคณะกรรมการส่งเสริมวิทยาศาสตร์ วิจัยและนวัตกรรม</h2>", unsafe_allow_html=True)
-st.markdown("<h4 class='sub-header'>ระบบรายงานและติดตามความก้าวหน้าผลการดำเนินงานตามมติที่ประชุม</h4>", unsafe_allow_html=True)
+st.markdown("<h4 class='sub-header'>ระบบรายงานและติดตามความก้าวหน้าผลการดำเนินงานตามมติที่ประชุมคณะกรรมการอำนวยการ</h4>", unsafe_allow_html=True)
 st.divider()
 
 # 2. สร้างโครงสร้างตารางเริ่มต้น (ถ้ายังไม่มีข้อมูล)
