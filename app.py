@@ -1,9 +1,8 @@
 import streamlit as st
-from streamlit_gsheets import GSheetsConnection
 import pandas as pd
 import io
 
-# 1. ตั้งค่าหน้าเพจและธีมสี (Navy - Orange)
+# 1. ตั้งค่าหน้าเพจและธีมสี
 st.set_page_config(page_title="ระบบติดตามมติการประชุม", layout="wide")
 
 st.markdown("""
@@ -15,93 +14,70 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 st.markdown("<h2 class='header-text'>สำนักงานคณะกรรมการส่งเสริมวิทยาศาสตร์ วิจัยและนวัตกรรม</h2>", unsafe_allow_html=True)
-st.markdown("<h4 class='sub-header'>แดชบอร์ดติดตามความก้าวหน้าผลการดำเนินงานตามมติที่ประชุม</h4>", unsafe_allow_html=True)
+st.markdown("<h4 class='sub-header'>ระบบรายงานและติดตามความก้าวหน้าผลการดำเนินงานตามมติที่ประชุม</h4>", unsafe_allow_html=True)
 st.divider()
 
-# 2. เชื่อมต่อ Google Sheets ผ่าน API
-# อย่าลืมเปลี่ยน URL ตรงนี้ให้เป็นไฟล์ของคุณ
-SHEET_URL = "https://docs.google.com/spreadsheets/d/1a7BDdWXv-MiPZYLkXPob48VA3ajPImQLxz1cJZNB7vY/edit?usp=sharing"
+# 2. สร้างโครงสร้างตารางเริ่มต้น (ถ้ายังไม่มีข้อมูล)
+if 'board_data' not in st.session_state:
+    st.session_state.board_data = pd.DataFrame(
+        columns=['ชื่อวาระ', 'มติการประชุม', 'ผู้รับผิดชอบ', 'ผลการดำเนินงาน', 'วันที่ส่งมอบ', 'สถานะ'],
+        data=[
+            ['วาระที่ 1', 'ข้อสั่งการ...', 'ฝ่าย...', 'รอการรายงาน...', '-', 'รอดำเนินการ']
+        ]
+    )
 
-conn = st.connection("gsheets", type=GSheetsConnection)
+st.write("📌 **คำแนะนำ:** คุณสามารถคลิกที่ตารางด้านล่างเพื่อพิมพ์ข้อความแก้ไข เพิ่มแถวใหม่ หรือลบข้อมูลได้ทันที")
 
-try:
-    df = conn.read(spreadsheet=SHEET_URL, ttl=300)
-    df = df.dropna(how="all")
+# 3. ส่วนกรอกและแก้ไขข้อมูลตรงบนเว็บ (Data Editor)
+edited_df = st.data_editor(
+    st.session_state.board_data,
+    num_rows="dynamic", # อนุญาตให้กดปุ่ม + เพิ่มแถวใหม่ได้
+    use_container_width=True,
+    column_config={
+        "สถานะ": st.column_config.SelectboxColumn(
+            "สถานะการดำเนินงาน",
+            help="เลือกสถานะ",
+            options=["รอดำเนินการ", "กำลังดำเนินการ", "เสร็จสิ้น"],
+            required=True
+        )
+    }
+)
+
+# บันทึกข้อมูลที่แก้ไขกลับเข้าไปในระบบ
+st.session_state.board_data = edited_df
+
+st.divider()
+
+# 4. ส่วนแสดงผลสรุป (KPI Metrics) ที่อัปเดตตามที่กรอกแบบ Real-time
+st.subheader("📊 สรุปภาพรวมการดำเนินงาน")
+col1, col2, col3 = st.columns(3)
+with col1:
+    st.metric("จำนวนวาระทั้งหมด", len(edited_df))
+with col2:
+    finished = len(edited_df[edited_df['สถานะ'] == 'เสร็จสิ้น'])
+    st.metric("เสร็จสิ้นแล้ว", finished)
+with col3:
+    in_progress = len(edited_df[edited_df['สถานะ'] == 'กำลังดำเนินการ'])
+    st.metric("กำลังดำเนินการ", in_progress)
+
+# ---------------------------------------------------------
+# 5. ส่วนดาวน์โหลดรายงาน
+# ---------------------------------------------------------
+st.write("---")
+st.subheader("📥 ดาวน์โหลดข้อมูลที่กรอกเรียบร้อยแล้ว")
+
+def to_excel(df_to_export):
+    output = io.BytesIO()
+    with pd.ExcelWriter(output, engine='openpyxl') as writer:
+        df_to_export.to_excel(writer, index=False, sheet_name='รายงานความก้าวหน้า')
+    return output.getvalue()
+
+if not edited_df.empty:
+    excel_file = to_excel(edited_df)
     
-    # 3. ส่วนแสดงผลสรุป (KPI Metrics)
-    col1, col2, col3 = st.columns(3)
-    with col1:
-        st.metric("จำนวนวาระทั้งหมด", len(df))
-    with col2:
-        finished = len(df[df['สถานะ'] == 'เสร็จสิ้น']) if 'สถานะ' in df.columns else 0
-        st.metric("เสร็จสิ้นแล้ว", finished)
-    with col3:
-        in_progress = len(df[df['สถานะ'] == 'กำลังดำเนินการ']) if 'สถานะ' in df.columns else 0
-        st.metric("กำลังดำเนินการ", in_progress)
-
-    st.write("") 
-
-    # 4. ฟิลเตอร์สำหรับค้นหาและกรองข้อมูล
-    st.subheader("🔍 ค้นหาและกรองข้อมูล")
-    filter_col1, filter_col2 = st.columns(2)
-    
-    filtered_df = df.copy()
-    
-    if 'ผู้รับผิดชอบ' in df.columns:
-        with filter_col1:
-            selected_dept = st.multiselect("กรองตามผู้รับผิดชอบ", options=df['ผู้รับผิดชอบ'].dropna().unique())
-            if selected_dept:
-                filtered_df = filtered_df[filtered_df['ผู้รับผิดชอบ'].isin(selected_dept)]
-                
-    if 'สถานะ' in df.columns:
-        with filter_col2:
-            selected_status = st.multiselect("กรองตามสถานะ", options=df['สถานะ'].dropna().unique())
-            if selected_status:
-                filtered_df = filtered_df[filtered_df['สถานะ'].isin(selected_status)]
-
-    # 5. แสดงตารางผลลัพธ์
-    st.subheader("📋 รายละเอียดผลการดำเนินงานรายวาระ")
-    st.dataframe(filtered_df, use_container_width=True, hide_index=True)
-
-    # ---------------------------------------------------------
-    # 6. ส่วนเพิ่มเติม: ปุ่มดาวน์โหลดรายงาน
-    # ---------------------------------------------------------
-    st.write("---")
-    st.subheader("📥 ดาวน์โหลดรายงานผลการดำเนินงาน")
-
-    def to_excel(df_to_export):
-        output = io.BytesIO()
-        with pd.ExcelWriter(output, engine='openpyxl') as writer:
-            df_to_export.to_excel(writer, index=False, sheet_name='ความก้าวหน้ามติที่ประชุม')
-        return output.getvalue()
-
-    @st.cache_data
-    def convert_df(df_to_export):
-        return df_to_export.to_csv(index=False, encoding='utf-8-sig')
-
-    if not filtered_df.empty:
-        excel_file = to_excel(filtered_df)
-        csv_file = convert_df(filtered_df)
-        
-        btn_col1, btn_col2, _ = st.columns([1, 1, 2])
-        
-        with btn_col1:
-            st.download_button(
-                label="📊 ดาวน์โหลดไฟล์ Excel",
-                data=excel_file,
-                file_name="progress_report.xlsx",
-                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-            )
-            
-        with btn_col2:
-            st.download_button(
-                label="📄 ดาวน์โหลดไฟล์ CSV",
-                data=csv_file,
-                file_name="progress_report.csv",
-                mime="text/csv"
-            )
-    else:
-        st.info("ไม่มีข้อมูลสำหรับดาวน์โหลด กรุณาปรับเงื่อนไขการค้นหาใหม่")
-
-except Exception as e:
-    st.error(f"เกิดข้อผิดพลาดในการเชื่อมต่อข้อมูล: {e}")
+    st.download_button(
+        label="📊 บันทึกและดาวน์โหลดไฟล์ Excel",
+        data=excel_file,
+        file_name="progress_report.xlsx",
+        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    )
