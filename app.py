@@ -20,7 +20,7 @@ st.divider()
 
 # 2. เชื่อมต่อ Google Sheets ผ่าน API
 # อย่าลืมเปลี่ยน URL ตรงนี้ให้เป็นไฟล์ของคุณ
-SHEET_URL = "https://docs.google.com/spreadsheets/d/YOUR_SPREADSHEET_ID/edit"
+SHEET_URL = "https://docs.google.com/spreadsheets/d/1a7BDdWXv-MiPZYLkXPob48VA3ajPImQLxz1cJZNB7vY/edit?usp=sharing"
 
 conn = st.connection("gsheets", type=GSheetsConnection)
 
